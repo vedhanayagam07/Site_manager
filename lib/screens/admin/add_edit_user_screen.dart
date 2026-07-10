@@ -1,0 +1,375 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/services/activity_log_service.dart';
+import '../../core/theme/app_colors.dart';
+
+class AddEditUserScreen extends StatefulWidget {
+  final Map<String, dynamic>? user; // null = create, non-null = edit
+
+  const AddEditUserScreen({super.key, this.user});
+
+  @override
+  State<AddEditUserScreen> createState() => _AddEditUserScreenState();
+}
+
+class _AddEditUserScreenState extends State<AddEditUserScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  String _selectedRole = 'supervisor';
+  String _selectedStatus = 'active';
+  bool _saving = false;
+  bool _obscurePassword = true;
+
+  bool get _isEditing => widget.user != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isEditing) {
+      final u = widget.user!;
+      _nameController.text = u['name'] as String? ?? '';
+      _emailController.text = u['email'] as String? ?? '';
+      _selectedRole = u['role'] as String? ?? 'supervisor';
+      _selectedStatus = u['status'] as String? ?? 'active';
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  /// Create a Supabase client using the service role key for admin operations.
+  /// Returns null if the key is not configured.
+  // ─────────────────────────────────────────────────────────────────────────
+  SupabaseClient? _getAdminClient() {
+    final serviceKey = dotenv.env['SUPABASE_SERVICE_ROLE_KEY'];
+    if (serviceKey == null || serviceKey.isEmpty) return null;
+    final url = dotenv.env['SUPABASE_URL'] ?? '';
+    return SupabaseClient(url, serviceKey);
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+
+    try {
+      if (_isEditing) {
+        // Edit mode: use service role key to bypass RLS
+        final adminClient = _getAdminClient();
+        if (adminClient == null) {
+          setState(() => _saving = false);
+          _showServiceKeyMissingDialog();
+          return;
+        }
+
+        await adminClient.from('user_profiles').update({
+          'name': _nameController.text.trim(),
+          'role': _selectedRole,
+          'status': _selectedStatus,
+        }).eq('id', widget.user!['id'] as String);
+
+        await activityLog.log(
+          action: 'User Updated',
+          module: 'Admin',
+          description:
+              'Updated: ${_nameController.text.trim()} → role=$_selectedRole, status=$_selectedStatus',
+        );
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('User updated successfully'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        Navigator.pop(context, true);
+      } else {
+        // Create mode: need service role key
+        final adminClient = _getAdminClient();
+
+        if (adminClient == null) {
+          if (!mounted) return;
+          setState(() => _saving = false);
+          _showServiceKeyMissingDialog();
+          return;
+        }
+
+        final email = _emailController.text.trim();
+        final password = _passwordController.text;
+
+        // Create auth user
+        final res = await adminClient.auth.admin.createUser(
+          AdminUserAttributes(
+            email: email,
+            password: password,
+            emailConfirm: true,
+            userMetadata: {'name': _nameController.text.trim()},
+          ),
+        );
+
+        final userId = res.user?.id;
+        if (userId == null) throw Exception('User creation returned no ID');
+
+        // Use adminClient (service role) to bypass RLS when saving profile
+        // This ensures it works even if the RLS policies have recursion issues
+        try {
+          await adminClient.from('user_profiles').upsert({
+            'id': userId,
+            'name': _nameController.text.trim(),
+            'email': email,
+            'role': _selectedRole,
+            'status': _selectedStatus,
+          });
+        } catch (_) {
+          // If upsert fails (e.g. unique constraint from DB trigger), try plain update
+          await adminClient.from('user_profiles').update({
+            'name': _nameController.text.trim(),
+            'email': email,
+            'role': _selectedRole,
+            'status': _selectedStatus,
+          }).eq('id', userId);
+        }
+
+        await activityLog.log(
+          action: 'User Created',
+          module: 'Admin',
+          description:
+              'Created: ${_nameController.text.trim()} ($email) as $_selectedRole',
+        );
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('User created successfully'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed: $e'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+    }
+  }
+
+  void _showServiceKeyMissingDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Service Role Key Required',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text(
+          'Creating users requires the Supabase Service Role Key.\n\n'
+          'Add SUPABASE_SERVICE_ROLE_KEY to your .env file.\n\n'
+          'Find it in: Supabase Dashboard → Project Settings → API → service_role key.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK', style: TextStyle(color: AppColors.roseGold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      resizeToAvoidBottomInset: true,
+      appBar: AppBar(
+        title: Text(_isEditing ? 'Edit User' : 'Add User'),
+      ),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          20,
+          20,
+          MediaQuery.of(context).viewInsets.bottom + 32,
+        ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Full Name',
+                  prefixIcon: Icon(Icons.person_outline),
+                  border: OutlineInputBorder(),
+                ),
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'Name is required' : null,
+              ),
+              const SizedBox(height: 16),
+
+              if (!_isEditing) ...[
+                TextFormField(
+                  controller: _emailController,
+                  decoration: const InputDecoration(
+                    labelText: 'Email Address',
+                    prefixIcon: Icon(Icons.email_outlined),
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Email is required';
+                    if (!v.contains('@')) return 'Enter a valid email';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _passwordController,
+                  obscureText: _obscurePassword,
+                  decoration: InputDecoration(
+                    labelText: 'Temporary Password',
+                    prefixIcon: const Icon(Icons.lock_outlined),
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscurePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
+                    ),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.length < 8) {
+                      return 'Password must be at least 8 characters';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              DropdownButtonFormField<String>(
+                value: _selectedRole,
+                dropdownColor: AppColors.card,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Role',
+                  prefixIcon: Icon(Icons.admin_panel_settings_outlined),
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'admin',
+                    child: Text('Admin — Full Access',
+                        overflow: TextOverflow.ellipsis),
+                  ),
+                  DropdownMenuItem(
+                    value: 'projectManager',
+                    child: Text('Project Manager — Sites & Reports',
+                        overflow: TextOverflow.ellipsis),
+                  ),
+                  DropdownMenuItem(
+                    value: 'supervisor',
+                    child: Text('Supervisor — Attendance & Materials',
+                        overflow: TextOverflow.ellipsis),
+                  ),
+                ],
+                onChanged: (v) => setState(() => _selectedRole = v!),
+              ),
+              const SizedBox(height: 16),
+
+              DropdownButtonFormField<String>(
+                value: _selectedStatus,
+                dropdownColor: AppColors.card,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Status',
+                  prefixIcon: Icon(Icons.toggle_on_outlined),
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'active',
+                    child: Text('Active'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'disabled',
+                    child: Text('Disabled'),
+                  ),
+                ],
+                onChanged: (v) => setState(() => _selectedStatus = v!),
+              ),
+              const SizedBox(height: 32),
+
+              if (!_isEditing) ...[
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(14),
+                    border:
+                        Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.info_outline, color: AppColors.warning, size: 18),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Creating users requires SUPABASE_SERVICE_ROLE_KEY in .env',
+                          style: TextStyle(
+                              color: AppColors.warning, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: FilledButton.icon(
+                  onPressed: _saving ? null : _save,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.roseGold,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                  ),
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save),
+                  label: Text(
+                    _saving ? 'Saving…' : (_isEditing ? 'Update User' : 'Create User'),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
