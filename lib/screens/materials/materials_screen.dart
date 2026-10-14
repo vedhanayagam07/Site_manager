@@ -4,6 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/widgets/shimmer_loader.dart';
 import '../../core/widgets/empty_state_widget.dart';
 import '../../core/widgets/status_chip.dart';
+import '../loading_memo/loading_memo_screen.dart';
 import 'add_material_screen.dart';
 import 'add_material_transaction_screen.dart';
 import 'material_detail_screen.dart';
@@ -133,6 +134,18 @@ class _MaterialsScreenState extends State<MaterialsScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            _buildFab(
+              heroTag: 'loadingMemo',
+              icon: Icons.receipt_long_outlined,
+              label: 'Loading Memo',
+              onTap: () {
+                Navigator.of(context, rootNavigator: true).push(
+                  MaterialPageRoute(
+                      builder: (_) => const LoadingMemoScreen()),
+                );
+              },
+            ),
+            const SizedBox(height: 10),
             _buildFab(
               heroTag: 'stockMovement',
               icon: Icons.swap_horiz,
