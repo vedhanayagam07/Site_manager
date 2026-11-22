@@ -202,13 +202,13 @@ export default function WorkersPage() {
       {/* Search & Filter */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative max-w-md flex-1">
-          <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[#778292]" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name, role, skill, or phone…"
-            className="h-10 w-full rounded-lg border border-slate-300 bg-white pr-3 pl-9 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20"
+            className="h-10 w-full rounded-xl border border-[rgba(190,205,225,0.18)] bg-[#101318]/70 pr-3 pl-9 text-sm text-[#F2F4F8] placeholder:text-[#778292] focus:border-[#4B83F5] focus:bg-[#101318]/90 focus:outline-none focus:ring-2 focus:ring-[#4B83F5]/25"
           />
         </div>
         <div className="flex gap-1.5">
@@ -217,10 +217,10 @@ export default function WorkersPage() {
               key={s}
               type="button"
               onClick={() => setStatusFilter(s)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
+              className={`rounded-xl px-3.5 py-2 text-xs font-semibold transition-all cursor-pointer ${
                 statusFilter === s
-                  ? "bg-[#0B1628] text-white"
-                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  ? "bg-[#4B83F5] text-white border border-[#4B83F5]/40 shadow-[0_0_12px_rgba(75,131,245,0.25)]"
+                  : "border border-[rgba(190,205,225,0.18)] bg-[rgba(23,28,36,0.6)] text-[#A7B0BE] hover:bg-white/5 hover:text-[#F2F4F8]"
               }`}
             >
               {s}
@@ -255,61 +255,61 @@ export default function WorkersPage() {
           <Card className="hidden overflow-hidden md:block">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+                <thead className="border-b border-[rgba(190,205,225,0.15)] bg-[rgba(23,28,36,0.7)] text-xs font-semibold uppercase tracking-wider text-[#A7B0BE]">
                   <tr>
-                    <th className="px-5 py-3">Worker</th>
-                    <th className="px-5 py-3">Role / Trade</th>
-                    <th className="px-5 py-3">Skill</th>
-                    <th className="px-5 py-3">Assigned Site</th>
-                    <th className="px-5 py-3">Phone</th>
-                    <th className="px-5 py-3">Status</th>
-                    <th className="px-5 py-3 text-right">Profile</th>
+                    <th className="px-5 py-3.5">Worker</th>
+                    <th className="px-5 py-3.5">Role / Trade</th>
+                    <th className="px-5 py-3.5">Skill</th>
+                    <th className="px-5 py-3.5">Assigned Site</th>
+                    <th className="px-5 py-3.5">Phone</th>
+                    <th className="px-5 py-3.5">Status</th>
+                    <th className="px-5 py-3.5 text-right">Profile</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-[rgba(190,205,225,0.08)]">
                   {filtered.map((w) => {
                     const siteLabel =
                       (w.site_id && siteNameById.get(w.site_id)) ||
                       w.assigned_site ||
                       "Unassigned";
                     return (
-                      <tr key={w.id} className="hover:bg-slate-50/70">
-                        <td className="px-5 py-3.5">
+                      <tr key={w.id} className="transition-colors hover:bg-white/[0.04]">
+                        <td className="px-5 py-4">
                           <Link
                             href={`/workers/${w.id}`}
-                            className="flex items-center gap-3 font-semibold text-slate-900 hover:text-[#2563EB]"
+                            className="flex items-center gap-3 font-semibold text-[#F2F4F8] hover:text-[#4B83F5] transition-colors"
                           >
-                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-[#2563EB]">
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500/15 border border-blue-500/30 text-xs font-bold text-[#4B83F5]">
                               {w.name.slice(0, 1).toUpperCase()}
                             </span>
-                            {w.name}
+                            <span className="text-sm font-semibold text-[#F2F4F8]">{w.name}</span>
                           </Link>
                         </td>
-                        <td className="px-5 py-3.5">
+                        <td className="px-5 py-4">
                           {w.role === "Supervisor" ? (
                             <Badge variant="blue">{w.role}</Badge>
                           ) : (
-                            <span className="text-xs font-medium text-slate-700">
+                            <span className="inline-flex items-center rounded-lg bg-white/[0.05] border border-white/[0.08] px-2.5 py-1 text-xs font-medium text-[#F2F4F8]">
                               {w.role || "—"}
                             </span>
                           )}
                         </td>
-                        <td className="px-5 py-3.5 text-xs text-slate-600">
+                        <td className="px-5 py-4 text-xs text-[#CBD3DF]">
                           {w.skill || "—"}
                         </td>
-                        <td className="px-5 py-3.5 text-xs text-slate-600">
+                        <td className="px-5 py-4 text-xs font-medium text-[#F2F4F8]">
                           {siteLabel}
                         </td>
-                        <td className="px-5 py-3.5 text-xs text-slate-600">
+                        <td className="px-5 py-4 font-mono text-xs text-[#A7B0BE]">
                           {w.phone || "—"}
                         </td>
-                        <td className="px-5 py-3.5">
+                        <td className="px-5 py-4">
                           <StatusBadge status={w.status} />
                         </td>
-                        <td className="px-5 py-3.5 text-right">
+                        <td className="px-5 py-4 text-right">
                           <Link
                             href={`/workers/${w.id}`}
-                            className="inline-flex items-center gap-1 text-xs font-medium text-[#2563EB] hover:underline"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-[rgba(190,205,225,0.18)] bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-[#4B83F5] hover:bg-blue-500/15 hover:border-blue-500/30 hover:text-white transition-all"
                           >
                             View
                             <ArrowRight className="h-3.5 w-3.5" />
@@ -332,38 +332,38 @@ export default function WorkersPage() {
                 "Unassigned";
               return (
                 <Link key={w.id} href={`/workers/${w.id}`} className="block">
-                  <Card>
+                  <Card className="transition-all hover:border-[rgba(220,230,245,0.25)]">
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-sm font-bold text-[#2563EB]">
+                          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500/15 border border-blue-500/30 text-sm font-bold text-[#4B83F5]">
                             {w.name.slice(0, 1).toUpperCase()}
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-slate-900">
+                            <p className="text-sm font-semibold text-[#F2F4F8]">
                               {w.name}
                             </p>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-[#A7B0BE]">
                               {w.role || "Worker"}
                             </p>
                           </div>
                         </div>
                         <StatusBadge status={w.status} />
                       </div>
-                      <div className="mt-3 flex flex-wrap gap-3 border-t border-slate-100 pt-2.5 text-xs text-slate-500">
+                      <div className="mt-3 flex flex-wrap gap-3 border-t border-[rgba(190,205,225,0.10)] pt-3 text-xs text-[#CBD3DF]">
                         {w.phone && (
-                          <span className="inline-flex items-center gap-1">
-                            <Phone className="h-3 w-3" />
+                          <span className="inline-flex items-center gap-1.5 font-mono text-[#A7B0BE]">
+                            <Phone className="h-3.5 w-3.5 text-[#778292]" />
                             {w.phone}
                           </span>
                         )}
-                        <span className="inline-flex items-center gap-1">
-                          <Building2 className="h-3 w-3" />
+                        <span className="inline-flex items-center gap-1.5 text-[#F2F4F8]">
+                          <Building2 className="h-3.5 w-3.5 text-[#4B83F5]" />
                           {siteLabel}
                         </span>
                         {w.skill && (
-                          <span className="inline-flex items-center gap-1">
-                            <Wrench className="h-3 w-3" />
+                          <span className="inline-flex items-center gap-1.5 text-[#CBD3DF]">
+                            <Wrench className="h-3.5 w-3.5 text-[#E5AD55]" />
                             {w.skill}
                           </span>
                         )}

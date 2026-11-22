@@ -67,51 +67,57 @@ export async function downloadLoadingMemoPdf(
 
   // ZERO watermarks across the document!
 
-  // 1. Header Section
+  // 1. Header Section: JFS Logo vertically centered relative to FELSHIA TRADERS company column
   const headerTop = 46;
-  const logoHeight = 54;
-  const logoWidth = logoHeight * 1.5; // 81 pt (3:2 aspect ratio)
+  const colWidth = 190;
+  const rightX = pageWidth - margin;
+  const columnLeftX = rightX - colWidth;
 
-  // LEFT: JFS Traders Logo
+  // Company information column on the right
+  const textTitleY = headerTop + 18;
+  doc.setTextColor(17, 24, 39); // Slate-900 #111827
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.text("FELSHIA TRADERS", columnLeftX, textTitleY);
+
+  // Thin underline beneath FELSHIA TRADERS spanning the column width
+  const underlineY = textTitleY + 6;
+  doc.setDrawColor(209, 213, 219); // Slate-300
+  doc.setLineWidth(1);
+  doc.line(columnLeftX, underlineY, rightX, underlineY);
+
+  // Subtitles left-aligned within the company info column
+  doc.setTextColor(75, 85, 99); // Slate-600
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10.5);
+  doc.text("since 1996", columnLeftX, underlineY + 16);
+
+  doc.setTextColor(55, 65, 81); // Slate-700
+  doc.text("ph: 967723589", columnLeftX, underlineY + 30);
+
+  // Header content block bounds
+  const headerBlockHeight = underlineY + 30 - headerTop; // ~54 pt
+  const headerCenterY = headerTop + headerBlockHeight / 2;
+
+  // LEFT: JFS Traders Logo (Vertically centered relative to company info)
+  const logoHeight = 48;
+  const logoWidth = logoHeight * 1.5; // 72 pt
+  const logoY = headerCenterY - logoHeight / 2;
   if (jfsLogo) {
-    doc.addImage(jfsLogo, "PNG", margin, headerTop, logoWidth, logoHeight);
+    doc.addImage(jfsLogo, "PNG", margin, logoY, logoWidth, logoHeight);
   }
 
-  // RIGHT: FELSHIA TRADERS Typography
-  const rightX = pageWidth - margin;
-  doc.setTextColor(17, 24, 39); // Slate-900 #111827
-  doc.setFont("helvetica", "italic");
-  doc.setFontSize(22);
-  doc.text("FELSHIA TRADERS", rightX, headerTop + 22, { align: "right" });
-
-  const titleWidth = doc.getTextWidth("FELSHIA TRADERS");
-  const blockCenterX = rightX - titleWidth / 2;
-
-  // Thin underline beneath FELSHIA TRADERS
-  doc.setDrawColor(209, 213, 219); // Gray-300
-  doc.setLineWidth(1);
-  doc.line(rightX - titleWidth, headerTop + 28, rightX, headerTop + 28);
-
-  // Subtitles
-  doc.setTextColor(31, 41, 55);
-  doc.setFont("helvetica", "italic");
-  doc.setFontSize(11);
-  doc.text("since 1996", blockCenterX, headerTop + 42, { align: "center" });
-
-  doc.setFontSize(11.5);
-  doc.text("ph: 967723589", blockCenterX, headerTop + 57, { align: "center" });
-
   // 2. Horizontal Divider below Header
-  const dividerY = headerTop + logoHeight + 16; // ~116 pt
-  doc.setDrawColor(156, 163, 175); // Slate-400
+  const dividerY = headerTop + headerBlockHeight + 16;
+  doc.setDrawColor(209, 213, 219); // Slate-300
   doc.setLineWidth(1);
-  doc.line(margin, dividerY, pageWidth - margin, dividerY);
+  doc.line(margin, dividerY, rightX, dividerY);
 
   // 3. Dispatch Date Aligned Right
-  const dateY = dividerY + 36; // ~152 pt
+  const dateY = dividerY + 32;
   doc.setTextColor(17, 24, 39);
-  doc.setFont("helvetica", "italic");
-  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10.5);
   doc.text(`DATE: ${formatDdMmYyyy(memo.date)}`, rightX, dateY, { align: "right" });
 
   // 4. Centered Dispatch Instruction Sentence (Body)
@@ -120,9 +126,9 @@ export async function downloadLoadingMemoPdf(
     ? String(Math.trunc(Number(memo.quantity)))
     : String(memo.quantity);
 
-  const sentence = `In the vehicle number,${cleanVehicle}, ${qtyDisplay} ${memo.unit} of ${memo.material_name} to be loaded.`;
+  const sentence = `In the vehicle number, ${cleanVehicle}, ${qtyDisplay} ${memo.unit} of ${memo.material_name} to be loaded.`;
 
-  const bodyY = dateY + 95; // ~247 pt
+  const bodyY = dateY + 90;
   doc.setTextColor(17, 24, 39);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(13);
@@ -134,8 +140,8 @@ export async function downloadLoadingMemoPdf(
   let currentY = bodyY + wrappedSentence.length * 22 + 25;
   if (memo.remarks?.trim()) {
     doc.setTextColor(75, 85, 99);
-    doc.setFont("helvetica", "italic");
-    doc.setFontSize(9.5);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
     const remarksText = `Remarks: ${memo.remarks.trim()}`;
     const wrappedRemarks = doc.splitTextToSize(remarksText, contentWidth - 60);
     doc.text(wrappedRemarks, pageWidth / 2, currentY, { align: "center", lineHeightFactor: 1.4 });

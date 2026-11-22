@@ -90,8 +90,9 @@ import {
   PageHeader,
 } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
+import { WorkforceReports } from "@/components/workforce-reports";
 
-type AttendanceTab = "workforce" | "supervisor" | "named" | "monthly" | "analytics";
+type AttendanceTab = "workforce" | "supervisor" | "named" | "monthly" | "analytics" | "reports";
 
 export default function AttendancePage() {
   const { user, profile, isPmOrAdmin, isSupervisor, sites: userAccessibleSites, selectedSiteId } = useAuth();
@@ -932,6 +933,7 @@ export default function AttendancePage() {
             { id: "named", label: "Staff Directory", icon: ClipboardCheck },
             { id: "monthly", label: "Monthly Calendar", icon: Calendar },
             { id: "analytics", label: "Analytics & Trends", icon: BarChart3 },
+            { id: "reports", label: "Workforce Reports", icon: BarChart3 },
           ] as Array<{
             id: AttendanceTab;
             label: string;
@@ -2446,6 +2448,11 @@ export default function AttendancePage() {
           </div>
         </div>
       )}
+
+      {/* ───────────────────────────────────────────────────────────────────── */}
+      {/* TAB 6: WORKFORCE REPORTS (DAY-WISE & WEEK-WISE REPORTING)             */}
+      {/* ───────────────────────────────────────────────────────────────────── */}
+      {tab === "reports" && <WorkforceReports />}
 
       {/* Attendance Correction Modal */}
       {correctModalRecord && (

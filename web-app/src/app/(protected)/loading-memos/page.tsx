@@ -367,25 +367,25 @@ export default function LoadingMemosPage() {
             {/* White A4 Document Sheet strictly matching Reference Screenshot */}
             <div className="mx-auto max-w-[620px] rounded-lg border border-slate-300 bg-white p-8 sm:p-12 shadow-sm min-h-[500px]">
               <div>
-                {/* 1. Header: Left JFS Logo | Right JFS Typography */}
-                <div className="flex items-start justify-between gap-4">
-                  <div className="h-16 w-24 shrink-0 overflow-hidden">
+                {/* 1. Header: Left JFS Logo | Right JFS Typography (Vertically Centered) */}
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex h-16 w-28 shrink-0 items-center overflow-hidden">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src="/jfstraders.png"
                       alt="JFS Traders"
-                      className="h-full w-full object-contain object-left"
+                      className="max-h-full w-auto object-contain object-left"
                     />
                   </div>
-                  <div className="text-right">
-                    <h2 className="text-xl sm:text-2xl font-light italic tracking-wider text-slate-900">
+                  <div className="w-56 text-left">
+                    <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
                       FELSHIA TRADERS
                     </h2>
-                    <div className="my-1.5 ml-auto h-[1px] w-48 bg-slate-300" />
-                    <p className="text-xs italic text-slate-700 text-center ml-auto w-48">
+                    <div className="my-1.5 h-[1px] w-full bg-slate-300" />
+                    <p className="text-xs font-normal text-slate-600">
                       since 1996
                     </p>
-                    <p className="text-xs italic text-slate-800 text-center ml-auto w-48">
+                    <p className="text-xs font-normal text-slate-700">
                       ph: 967723589
                     </p>
                   </div>
@@ -396,7 +396,7 @@ export default function LoadingMemosPage() {
 
                 {/* 3. Dispatch Date Aligned Right */}
                 <div className="text-right">
-                  <span className="text-xs sm:text-sm font-semibold italic tracking-wider text-slate-900">
+                  <span className="text-xs sm:text-sm font-semibold text-slate-900">
                     DATE: {formatDdMmYyyy(date)}
                   </span>
                 </div>
@@ -406,7 +406,7 @@ export default function LoadingMemosPage() {
                   <p className="text-sm sm:text-base leading-relaxed text-slate-900 font-normal">
                     {vehicleNumber.trim() || effectiveMaterialName || quantity ? (
                       <>
-                        In the vehicle number,
+                        In the vehicle number,{" "}
                         <span className="font-semibold text-slate-900">
                           {vehicleNumber.toUpperCase().trim() || "TN— — — —"}
                         </span>
@@ -421,7 +421,7 @@ export default function LoadingMemosPage() {
                         to be loaded.
                       </>
                     ) : (
-                      <span className="text-slate-400 italic">
+                      <span className="text-slate-400">
                         Enter dispatch details on the left to generate the loading memo instruction.
                       </span>
                     )}
@@ -429,7 +429,7 @@ export default function LoadingMemosPage() {
 
                   {/* Optional Remarks if supplied */}
                   {remarks.trim() && (
-                    <p className="mt-4 text-xs italic text-slate-500">
+                    <p className="mt-4 text-xs font-normal text-slate-600">
                       Remarks: {remarks.trim()}
                     </p>
                   )}

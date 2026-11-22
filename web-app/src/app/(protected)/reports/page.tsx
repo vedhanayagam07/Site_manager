@@ -9,6 +9,8 @@ import {
   Package,
   AlertTriangle,
   RefreshCw,
+  HardHat,
+  FileSpreadsheet,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -54,11 +56,13 @@ import { StatusBadge } from "@/components/ui/badge";
 import { ErrorBanner, LoadingCards, PageHeader } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
 import { useAuth } from "@/context/auth-context";
+import { WorkforceReports } from "@/components/workforce-reports";
 
 export default function ReportsPage() {
   const { selectedSiteId } = useAuth();
   const toast = useToast();
 
+  const [activeTab, setActiveTab] = useState<"workforce" | "executive">("workforce");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sites, setSites] = useState<SiteRecord[]>([]);
@@ -181,10 +185,10 @@ export default function ReportsPage() {
   }
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Reports & Analytics"
-        description={`Export executive PDF reports and inspect material consumption for ${monthLabel}.`}
+        description="Comprehensive workforce deployment intelligence, executive PDF reports, and inventory consumption."
         actions={
           <Button variant="outline" size="sm" onClick={load} loading={loading}>
             <RefreshCw className="h-3.5 w-3.5" />
@@ -195,185 +199,226 @@ export default function ReportsPage() {
 
       {error && <ErrorBanner message={error} onRetry={load} />}
 
-      {loading ? (
-        <LoadingCards count={4} />
-      ) : (
-        <>
-          {/* PDF Export Cards */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardContent className="flex h-full flex-col justify-between p-5">
-                <div>
-                  <div className="mb-3 inline-flex rounded-lg bg-blue-50 p-2.5 text-[#2563EB]">
-                    <Users className="h-5 w-5" />
-                  </div>
-                  <h3 className="text-sm font-semibold text-slate-900">
-                    Worker Report
-                  </h3>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {workers.length} workers with roles, skills, sites &amp; status.
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-4 w-full"
-                  onClick={() => runExport("worker")}
-                >
-                  <FileDown className="h-3.5 w-3.5" />
-                  Export PDF
-                </Button>
-              </CardContent>
-            </Card>
+      {/* Main Tab Navigation */}
+      <div className="flex flex-wrap gap-2 border-b border-[rgba(190,205,225,0.12)] pb-3">
+        <button
+          type="button"
+          onClick={() => setActiveTab("workforce")}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all cursor-pointer ${
+            activeTab === "workforce"
+              ? "bg-[#4B83F5] text-white shadow-[0_0_16px_rgba(75,131,245,0.35)]"
+              : "border border-[rgba(190,205,225,0.18)] bg-[rgba(23,28,36,0.6)] text-[#A7B0BE] hover:bg-white/5 hover:text-[#F2F4F8]"
+          }`}
+        >
+          <HardHat className="h-4 w-4" />
+          Workforce Deployment Reports
+        </button>
 
-            <Card>
-              <CardContent className="flex h-full flex-col justify-between p-5">
-                <div>
-                  <div className="mb-3 inline-flex rounded-lg bg-emerald-50 p-2.5 text-emerald-700">
-                    <ClipboardCheck className="h-5 w-5" />
-                  </div>
-                  <h3 className="text-sm font-semibold text-slate-900">
-                    Attendance Report
-                  </h3>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {monthAttendance.length} records logged in {monthLabel}.
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-4 w-full"
-                  onClick={() => runExport("attendance")}
-                >
-                  <FileDown className="h-3.5 w-3.5" />
-                  Export PDF
-                </Button>
-              </CardContent>
-            </Card>
+        <button
+          type="button"
+          onClick={() => setActiveTab("executive")}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all cursor-pointer ${
+            activeTab === "executive"
+              ? "bg-[#4B83F5] text-white shadow-[0_0_16px_rgba(75,131,245,0.35)]"
+              : "border border-[rgba(190,205,225,0.18)] bg-[rgba(23,28,36,0.6)] text-[#A7B0BE] hover:bg-white/5 hover:text-[#F2F4F8]"
+          }`}
+        >
+          <FileDown className="h-4 w-4" />
+          Executive PDF Exports &amp; Stock
+        </button>
+      </div>
 
-            <Card>
-              <CardContent className="flex h-full flex-col justify-between p-5">
-                <div>
-                  <div className="mb-3 inline-flex rounded-lg bg-amber-50 p-2.5 text-amber-700">
-                    <Package className="h-5 w-5" />
-                  </div>
-                  <h3 className="text-sm font-semibold text-slate-900">
-                    Material Inventory Report
-                  </h3>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {materials.length} items, {lowStockItems.length} low stock alerts &amp;
-                    transactions.
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-4 w-full"
-                  onClick={() => runExport("material")}
-                >
-                  <FileDown className="h-3.5 w-3.5" />
-                  Export PDF
-                </Button>
-              </CardContent>
-            </Card>
+      {/* TAB 1: WORKFORCE DEPLOYMENT REPORTS (Day-Wise & Week-Wise) */}
+      {activeTab === "workforce" && <WorkforceReports />}
 
-            <Card>
-              <CardContent className="flex h-full flex-col justify-between p-5">
-                <div>
-                  <div className="mb-3 inline-flex rounded-lg bg-slate-100 p-2.5 text-slate-700">
-                    <Building2 className="h-5 w-5" />
-                  </div>
-                  <h3 className="text-sm font-semibold text-slate-900">
-                    Site Portfolio Report
-                  </h3>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {sites.length} sites with locations, managers &amp; progress.
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-4 w-full"
-                  onClick={() => runExport("site")}
-                >
-                  <FileDown className="h-3.5 w-3.5" />
-                  Export PDF
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Analytics Visuals */}
-          <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <div>
-                  <CardTitle>Material Consumption by Site ({monthLabel})</CardTitle>
-                  <CardDescription>Total USED quantities logged this month</CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {siteUsageChart.length === 0 ? (
-                  <p className="py-12 text-center text-xs text-slate-500">
-                    No material usage transactions recorded this month.
-                  </p>
-                ) : (
-                  <div className="h-64 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={siteUsageChart}
-                        margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-                        <XAxis dataKey="site" tick={{ fontSize: 11, fill: "#64748B" }} />
-                        <YAxis tick={{ fontSize: 11, fill: "#64748B" }} />
-                        <Tooltip />
-                        <Bar dataKey="qty" name="Units Used" fill="#2563EB" radius={[6, 6, 0, 0]} maxBarSize={36} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+      {/* TAB 2: EXECUTIVE PDF EXPORTS & MATERIAL CONSUMPTION */}
+      {activeTab === "executive" && (
+        loading ? (
+          <LoadingCards count={4} />
+        ) : (
+          <div className="space-y-6">
+            {/* PDF Export Cards */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <Card className="border-[rgba(190,205,225,0.15)] bg-[rgba(35,42,53,0.60)]">
+                <CardContent className="flex h-full flex-col justify-between p-5">
                   <div>
-                    <CardTitle>Low Stock Watchlist ({lowStockItems.length})</CardTitle>
-                    <CardDescription>Items at or below minimum required balance</CardDescription>
+                    <div className="mb-3 inline-flex rounded-xl bg-blue-500/15 border border-blue-500/30 p-2.5 text-[#4B83F5]">
+                      <Users className="h-5 w-5" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-[#F2F4F8]">
+                      Worker Directory Report
+                    </h3>
+                    <p className="mt-1 text-xs text-[#A7B0BE]">
+                      {workers.length} workers with roles, skills, sites &amp; status.
+                    </p>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                {lowStockItems.length === 0 ? (
-                  <p className="p-8 text-center text-xs text-slate-500">
-                    No materials are currently below minimum stock threshold.
-                  </p>
-                ) : (
-                  <div className="divide-y divide-slate-100">
-                    {lowStockItems.map((m) => (
-                      <div
-                        key={m.id}
-                        className="flex items-center justify-between px-5 py-3"
-                      >
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900">{m.name}</p>
-                          <p className="text-xs text-slate-500">
-                            Balance: {formatNumber(m.balance_qty)} {m.unit} · Min:{" "}
-                            {formatNumber(m.minimum_stock ?? 10)}
-                          </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-4 w-full"
+                    onClick={() => runExport("worker")}
+                  >
+                    <FileDown className="h-3.5 w-3.5" />
+                    Export PDF
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="border-[rgba(190,205,225,0.15)] bg-[rgba(35,42,53,0.60)]">
+                <CardContent className="flex h-full flex-col justify-between p-5">
+                  <div>
+                    <div className="mb-3 inline-flex rounded-xl bg-emerald-500/15 border border-emerald-500/30 p-2.5 text-[#39B980]">
+                      <ClipboardCheck className="h-5 w-5" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-[#F2F4F8]">
+                      Attendance Summary Report
+                    </h3>
+                    <p className="mt-1 text-xs text-[#A7B0BE]">
+                      {monthAttendance.length} records logged in {monthLabel}.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-4 w-full"
+                    onClick={() => runExport("attendance")}
+                  >
+                    <FileDown className="h-3.5 w-3.5" />
+                    Export PDF
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="border-[rgba(190,205,225,0.15)] bg-[rgba(35,42,53,0.60)]">
+                <CardContent className="flex h-full flex-col justify-between p-5">
+                  <div>
+                    <div className="mb-3 inline-flex rounded-xl bg-amber-500/15 border border-amber-500/30 p-2.5 text-[#E5AD55]">
+                      <Package className="h-5 w-5" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-[#F2F4F8]">
+                      Material Inventory Report
+                    </h3>
+                    <p className="mt-1 text-xs text-[#A7B0BE]">
+                      {materials.length} items, {lowStockItems.length} low stock alerts &amp; transactions.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-4 w-full"
+                    onClick={() => runExport("material")}
+                  >
+                    <FileDown className="h-3.5 w-3.5" />
+                    Export PDF
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="border-[rgba(190,205,225,0.15)] bg-[rgba(35,42,53,0.60)]">
+                <CardContent className="flex h-full flex-col justify-between p-5">
+                  <div>
+                    <div className="mb-3 inline-flex rounded-xl bg-purple-500/15 border border-purple-500/30 p-2.5 text-purple-400">
+                      <Building2 className="h-5 w-5" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-[#F2F4F8]">
+                      Site Portfolio Report
+                    </h3>
+                    <p className="mt-1 text-xs text-[#A7B0BE]">
+                      {sites.length} sites with locations, managers &amp; progress.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-4 w-full"
+                    onClick={() => runExport("site")}
+                  >
+                    <FileDown className="h-3.5 w-3.5" />
+                    Export PDF
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Analytics Visuals */}
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <div>
+                    <CardTitle>Material Consumption by Site ({monthLabel})</CardTitle>
+                    <CardDescription>Total USED quantities logged this month</CardDescription>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {siteUsageChart.length === 0 ? (
+                    <p className="py-12 text-center text-xs text-[#A7B0BE]">
+                      No material usage transactions recorded this month.
+                    </p>
+                  ) : (
+                    <div className="h-64 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={siteUsageChart}
+                          margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(190,205,225,0.10)" vertical={false} />
+                          <XAxis dataKey="site" tick={{ fontSize: 11, fill: "#A7B0BE" }} />
+                          <YAxis tick={{ fontSize: 11, fill: "#A7B0BE" }} />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: "#171C24",
+                              borderColor: "rgba(190,205,225,0.20)",
+                              borderRadius: "12px",
+                              color: "#F2F4F8",
+                            }}
+                          />
+                          <Bar dataKey="qty" name="Units Used" fill="#4B83F5" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-[#E5AD55]" />
+                    <div>
+                      <CardTitle>Low Stock Watchlist ({lowStockItems.length})</CardTitle>
+                      <CardDescription>Items at or below minimum required balance</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {lowStockItems.length === 0 ? (
+                    <p className="p-8 text-center text-xs text-[#A7B0BE]">
+                      No materials are currently below minimum stock threshold.
+                    </p>
+                  ) : (
+                    <div className="divide-y divide-[rgba(190,205,225,0.08)]">
+                      {lowStockItems.map((m) => (
+                        <div
+                          key={m.id}
+                          className="flex items-center justify-between px-5 py-3.5 hover:bg-white/[0.03] transition-colors"
+                        >
+                          <div>
+                            <p className="text-sm font-semibold text-[#F2F4F8]">{m.name}</p>
+                            <p className="text-xs text-[#A7B0BE]">
+                              Balance: {formatNumber(m.balance_qty)} {m.unit} · Min:{" "}
+                              {formatNumber(m.minimum_stock ?? 10)}
+                            </p>
+                          </div>
+                          <StatusBadge status="Low Stock" />
                         </div>
-                        <StatusBadge status="Low Stock" />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
-        </>
+        )
       )}
     </div>
   );
