@@ -13,6 +13,7 @@ import {
   FileDown,
   Search,
   RefreshCw,
+  AlertTriangle,
 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import {
@@ -20,6 +21,7 @@ import {
   adminDeleteUser,
   adminToggleUserStatus,
   adminUpdateUser,
+  checkAdminFunctionHealth,
   fetchAllUserProfiles,
 } from "@/lib/data/admin";
 import { fetchActivityLogs } from "@/lib/data/activity-logs";
@@ -114,6 +116,7 @@ export default function AdminPage() {
   const [userErrors, setUserErrors] = useState<Record<string, string>>({});
   const [userToDelete, setUserToDelete] = useState<UserProfile | null>(null);
   const [deletingUser, setDeletingUser] = useState(false);
+  const [functionReady, setFunctionReady] = useState(true);
 
   const loadDashboard = useCallback(async () => {
     if (!isAdmin) return;
@@ -129,6 +132,7 @@ export default function AdminPage() {
         materialsRes,
         todayAttRes,
         logsList,
+        healthRes,
       ] = await Promise.all([
         fetchAllUserProfiles(),
         supabase
@@ -147,10 +151,12 @@ export default function AdminPage() {
           toDate: toDate || undefined,
           limit: 100,
         }),
+        checkAdminFunctionHealth(),
       ]);
 
       setProfiles(usersList);
       setLogs(logsList);
+      setFunctionReady(healthRes.ready);
       setStats({
         totalUsers: usersList.length,
         activeUsers: usersList.filter((u) => u.status === "active").length,
@@ -380,6 +386,30 @@ export default function AdminPage() {
           Activity Audit Log ({filteredLogs.length})
         </button>
       </div>
+
+      {/* Backend Function Deployment Alert */}
+      {!functionReady && (
+        <div className="mb-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-[#F2F4F8] backdrop-blur-md">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[#E5AD55]" />
+            <div className="space-y-1">
+              <p className="font-bold text-[#E5AD55]">
+                Edge Function Deployment Required: <code>admin-manage-user</code>
+              </p>
+              <p className="text-[#CBD3DF] leading-relaxed">
+                User creation, role updates, and account deletions are executed securely server-side via Supabase Edge Function.
+                The function is not currently deployed to project <code>yrgsgjiqijccunisqzqz</code>.
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="text-[11px] text-[#A7B0BE]">Deploy with Supabase CLI:</span>
+                <code className="rounded-lg bg-black/40 px-2.5 py-1 font-mono text-[11px] text-[#4B83F5] border border-white/10 select-all">
+                  supabase functions deploy admin-manage-user --project-ref yrgsgjiqijccunisqzqz
+                </code>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* TAB 1: User Management */}
       {tab === "users" && (

@@ -129,15 +129,23 @@ export function diagnoseError(error: unknown, operation?: string): DiagnosticErr
   // 1. Edge Function Failures
   if (
     lower.includes("functionsfetcherror") ||
-    lower.includes("failed to send a request to the edge function") ||
+    lower.includes("failed to send a request") ||
     lower.includes("requested function was not found") ||
     lower.includes("functionshttperror") ||
-    lower.includes("edge function")
+    lower.includes("edge function") ||
+    lower.includes("admin-manage-user")
   ) {
     let safeMessage = "Failed to communicate with the server management function.";
-    if (lower.includes("not found") || lower.includes("failed to send a request")) {
+    if (
+      lower.includes("not deployed") ||
+      lower.includes("not found") ||
+      lower.includes("unreachable") ||
+      lower.includes("failed to send a request")
+    ) {
       safeMessage =
-        "The requested Edge Function is not deployed or unreachable. Please verify deployment in Supabase.";
+        "Edge Function 'admin-manage-user' is not deployed to Supabase project yrgsgjiqijccunisqzqz. Please deploy it with: supabase functions deploy admin-manage-user --project-ref yrgsgjiqijccunisqzqz";
+    } else if (lower.includes("forbidden") || lower.includes("admin privileges")) {
+      safeMessage = "Action blocked: Active administrator privileges required.";
     }
     return {
       category: "EDGE_FUNCTION_ERROR",

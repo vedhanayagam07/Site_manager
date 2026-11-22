@@ -116,6 +116,13 @@ serve(async (req: Request) => {
     const action = String(body.action || "").trim();
 
     // ─────────────────────────────────────────────────────────────────────────
+    // ACTION: health_check
+    // ─────────────────────────────────────────────────────────────────────────
+    if (action === "health_check") {
+      return jsonResponse({ success: true, status: "healthy", version: "1.0.0" });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // ACTION: list_users
     // ─────────────────────────────────────────────────────────────────────────
     if (action === "list_users") {

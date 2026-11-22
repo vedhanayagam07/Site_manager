@@ -16,9 +16,13 @@ async function invokeAdminFunction<T>(body: Record<string, unknown>): Promise<T>
   if (error) {
     // Surface structured Edge Function error message if present
     const details = (error as { context?: { status?: number; json?: () => Promise<{ error?: string; message?: string }> } }).context;
-    if (details?.status === 404 || error.message?.includes("Failed to send a request")) {
+    if (
+      details?.status === 404 ||
+      error.message?.includes("Failed to send a request") ||
+      error.message?.includes("not found")
+    ) {
       throw new Error(
-        "Edge Function 'admin-manage-user' is not deployed or unreachable on this Supabase project. Please deploy it with: supabase functions deploy admin-manage-user"
+        "Edge Function 'admin-manage-user' is not deployed to Supabase project yrgsgjiqijccunisqzqz. Please deploy it with: supabase functions deploy admin-manage-user --project-ref yrgsgjiqijccunisqzqz"
       );
     }
     if (details && typeof details.json === "function") {
@@ -40,6 +44,27 @@ async function invokeAdminFunction<T>(body: Record<string, unknown>): Promise<T>
   }
 
   return data as T;
+}
+
+export async function checkAdminFunctionHealth(): Promise<{ ready: boolean; error?: string }> {
+  try {
+    const supabase = createClient();
+    const { error } = await supabase.functions.invoke("admin-manage-user", {
+      body: { action: "health_check" },
+    });
+    if (error) {
+      const details = (error as { context?: { status?: number } }).context;
+      if (details?.status === 404 || error.message?.includes("Failed to send a request")) {
+        return {
+          ready: false,
+          error: "Edge Function 'admin-manage-user' is not deployed to Supabase project yrgsgjiqijccunisqzqz.",
+        };
+      }
+    }
+    return { ready: true };
+  } catch (err) {
+    return { ready: false, error: String(err) };
+  }
 }
 
 export async function fetchAllUserProfiles(): Promise<UserProfile[]> {
