@@ -38,7 +38,7 @@ void main() {
     } catch (e) {
       print('ERROR QUERYING SITE ATTENDANCE: ' + e.toString());
     }
-  });
+  }, skip: 'Live network calls are disabled in local pre-production test suites');
 
   test('VoiceParser Tanglish test - "anju mooda ramco cement used"', () {
     final action = VoiceParser.parse(

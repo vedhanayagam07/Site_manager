@@ -1,0 +1,51 @@
+{
+  "name": "TSR Builders — Construction Operations",
+  "short_name": "TSR Builders",
+  "description": "Enterprise construction management, daily workforce attendance, material inventory, and dispatch platform.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "id": "/dashboard",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "window-controls-overlay"],
+  "background_color": "#0B1628",
+  "theme_color": "#0B1628",
+  "orientation": "portrait-primary",
+  "categories": ["business", "productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Attendance",
+      "short_name": "Attendance",
+      "description": "Log daily workforce and supervisor attendance",
+      "url": "/attendance",
+      "icons": [{ "src": "/tsrbuilders.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Materials",
+      "short_name": "Materials",
+      "description": "Inventory balances and stock movement ledger",
+      "url": "/materials",
+      "icons": [{ "src": "/tsrbuilders.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Loading Memos",
+      "short_name": "Memos",
+      "description": "Create and export vehicle transit dispatch memos",
+      "url": "/loading-memos",
+      "icons": [{ "src": "/tsrbuilders.png", "sizes": "192x192" }]
+    }
+  ],
+  "icons": [
+    {
+      "src": "/tsrbuilders.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/tsrbuilders.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

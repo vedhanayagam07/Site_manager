@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/services/activity_log_service.dart';
 import '../../core/theme/app_colors.dart';
@@ -45,36 +44,30 @@ class _AddEditUserScreenState extends State<AddEditUserScreen> {
     super.dispose();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  /// Create a Supabase client using the service role key for admin operations.
-  /// Returns null if the key is not configured.
-  // ─────────────────────────────────────────────────────────────────────────
-  SupabaseClient? _getAdminClient() {
-    final serviceKey = dotenv.env['SUPABASE_SERVICE_ROLE_KEY'];
-    if (serviceKey == null || serviceKey.isEmpty) return null;
-    final url = dotenv.env['SUPABASE_URL'] ?? '';
-    return SupabaseClient(url, serviceKey);
-  }
-
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
 
     try {
       if (_isEditing) {
-        // Edit mode: use service role key to bypass RLS
-        final adminClient = _getAdminClient();
-        if (adminClient == null) {
-          setState(() => _saving = false);
-          _showServiceKeyMissingDialog();
-          return;
-        }
+        // Edit mode: invoke server-side authenticated Edge Function
+        final res = await Supabase.instance.client.functions.invoke(
+          'admin-manage-user',
+          body: {
+            'action': 'update_user',
+            'userId': widget.user!['id'],
+            'name': _nameController.text.trim(),
+            'role': _selectedRole,
+            'status': _selectedStatus,
+          },
+        );
 
-        await adminClient.from('user_profiles').update({
-          'name': _nameController.text.trim(),
-          'role': _selectedRole,
-          'status': _selectedStatus,
-        }).eq('id', widget.user!['id'] as String);
+        if (res.status != 200) {
+          final errorMsg = (res.data is Map && res.data['error'] != null)
+              ? res.data['error'].toString()
+              : 'Failed to update user.';
+          throw Exception(errorMsg);
+        }
 
         await activityLog.log(
           action: 'User Updated',
@@ -92,50 +85,27 @@ class _AddEditUserScreenState extends State<AddEditUserScreen> {
         );
         Navigator.pop(context, true);
       } else {
-        // Create mode: need service role key
-        final adminClient = _getAdminClient();
-
-        if (adminClient == null) {
-          if (!mounted) return;
-          setState(() => _saving = false);
-          _showServiceKeyMissingDialog();
-          return;
-        }
-
+        // Create mode: invoke server-side authenticated Edge Function
         final email = _emailController.text.trim();
         final password = _passwordController.text;
 
-        // Create auth user
-        final res = await adminClient.auth.admin.createUser(
-          AdminUserAttributes(
-            email: email,
-            password: password,
-            emailConfirm: true,
-            userMetadata: {'name': _nameController.text.trim()},
-          ),
+        final res = await Supabase.instance.client.functions.invoke(
+          'admin-manage-user',
+          body: {
+            'action': 'create_user',
+            'email': email,
+            'password': password,
+            'name': _nameController.text.trim(),
+            'role': _selectedRole,
+            'status': _selectedStatus,
+          },
         );
 
-        final userId = res.user?.id;
-        if (userId == null) throw Exception('User creation returned no ID');
-
-        // Use adminClient (service role) to bypass RLS when saving profile
-        // This ensures it works even if the RLS policies have recursion issues
-        try {
-          await adminClient.from('user_profiles').upsert({
-            'id': userId,
-            'name': _nameController.text.trim(),
-            'email': email,
-            'role': _selectedRole,
-            'status': _selectedStatus,
-          });
-        } catch (_) {
-          // If upsert fails (e.g. unique constraint from DB trigger), try plain update
-          await adminClient.from('user_profiles').update({
-            'name': _nameController.text.trim(),
-            'email': email,
-            'role': _selectedRole,
-            'status': _selectedStatus,
-          }).eq('id', userId);
+        if (res.status != 200) {
+          final errorMsg = (res.data is Map && res.data['error'] != null)
+              ? res.data['error'].toString()
+              : 'Failed to create user.';
+          throw Exception(errorMsg);
         }
 
         await activityLog.log(
@@ -157,36 +127,19 @@ class _AddEditUserScreenState extends State<AddEditUserScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
+      String errorMsg = e.toString();
+      if (e is FunctionException && e.details is Map && e.details['error'] != null) {
+        errorMsg = e.details['error'].toString();
+      } else if (errorMsg.startsWith('Exception: ')) {
+        errorMsg = errorMsg.substring(11);
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed: $e'),
+          content: Text('Failed: $errorMsg'),
           backgroundColor: AppColors.danger,
         ),
       );
     }
-  }
-
-  void _showServiceKeyMissingDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.card,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Service Role Key Required',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        content: const Text(
-          'Creating users requires the Supabase Service Role Key.\n\n'
-          'Add SUPABASE_SERVICE_ROLE_KEY to your .env file.\n\n'
-          'Find it in: Supabase Dashboard → Project Settings → API → service_role key.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('OK', style: TextStyle(color: AppColors.roseGold)),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -263,7 +216,7 @@ class _AddEditUserScreenState extends State<AddEditUserScreen> {
               ],
 
               DropdownButtonFormField<String>(
-                value: _selectedRole,
+                initialValue: _selectedRole,
                 dropdownColor: AppColors.card,
                 isExpanded: true,
                 decoration: const InputDecoration(
@@ -293,7 +246,7 @@ class _AddEditUserScreenState extends State<AddEditUserScreen> {
               const SizedBox(height: 16),
 
               DropdownButtonFormField<String>(
-                value: _selectedStatus,
+                initialValue: _selectedStatus,
                 dropdownColor: AppColors.card,
                 isExpanded: true,
                 decoration: const InputDecoration(
@@ -314,32 +267,6 @@ class _AddEditUserScreenState extends State<AddEditUserScreen> {
                 onChanged: (v) => setState(() => _selectedStatus = v!),
               ),
               const SizedBox(height: 32),
-
-              if (!_isEditing) ...[
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppColors.warning.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(14),
-                    border:
-                        Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.info_outline, color: AppColors.warning, size: 18),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Creating users requires SUPABASE_SERVICE_ROLE_KEY in .env',
-                          style: TextStyle(
-                              color: AppColors.warning, fontSize: 12),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
 
               SizedBox(
                 width: double.infinity,

@@ -280,7 +280,6 @@ class _ScaffoldWithNavBar extends ConsumerWidget {
     final roleAsync = ref.watch(currentUserRoleProvider);
     final role = roleAsync.maybeWhen(data: (r) => r, orElse: () => AppRole.supervisor);
     final isAdmin = role == AppRole.admin;
-    final isSupervisor = role == AppRole.supervisor;
 
     // Supervisor: Home, Sites, Workers, Attendance, Materials, Reports (no Admin)
     // Project Manager: Home, Sites, Workers, Attendance, Materials, Reports (no Admin)

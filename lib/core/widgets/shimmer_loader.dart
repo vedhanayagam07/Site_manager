@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
 
 /// Skeleton shimmer loader — renders a shimmering placeholder while data loads.
 /// Use [ShimmerBlock] for individual shimmer shapes.

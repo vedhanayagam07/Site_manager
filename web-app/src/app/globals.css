@@ -1,0 +1,128 @@
+@import "tailwindcss";
+
+@theme {
+  --color-graphite-950: #101318;
+  --color-graphite-900: #171C24;
+  --color-graphite-850: #1C222C;
+  --color-graphite-800: #232A35;
+  --color-graphite-700: #2D3541;
+  --color-graphite-600: #3E4856;
+  --color-graphite-500: #586578;
+  --color-graphite-400: #778292;
+  --color-graphite-300: #A7B0BE;
+  --color-graphite-200: #CBD3DF;
+  --color-graphite-100: #E4E8EF;
+  --color-graphite-50: #F2F4F8;
+
+  --color-glass-panel: rgba(35, 42, 53, 0.60);
+  --color-glass-elevated: rgba(45, 53, 65, 0.68);
+  --color-glass-inset: rgba(16, 19, 24, 0.65);
+  --color-glass-modal: rgba(23, 28, 36, 0.88);
+
+  --color-border-primary: rgba(190, 205, 225, 0.15);
+  --color-border-highlight: rgba(220, 230, 245, 0.22);
+  --color-border-subtle: rgba(190, 205, 225, 0.08);
+
+  --color-text-primary: #F2F4F8;
+  --color-text-secondary: #A7B0BE;
+  --color-text-muted: #778292;
+
+  --color-brand-blue: #4B83F5;
+  --color-brand-blue-hover: #3B72E4;
+  --color-status-success: #39B980;
+  --color-status-warning: #E5AD55;
+  --color-status-danger: #E56B72;
+
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+@layer base {
+  html,
+  body {
+    background-color: #101318;
+    color: #F2F4F8;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  * {
+    border-color: rgba(190, 205, 225, 0.12);
+  }
+
+  ::selection {
+    background-color: rgba(75, 131, 245, 0.35);
+    color: #ffffff;
+  }
+}
+
+/* Glassmorphism utility classes */
+.glass-panel {
+  background: rgba(35, 42, 53, 0.60);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(190, 205, 225, 0.15);
+  box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.40), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.glass-elevated {
+  background: rgba(45, 53, 65, 0.68);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(220, 230, 245, 0.22);
+  box-shadow: 0 8px 32px -2px rgba(0, 0, 0, 0.50), inset 0 1px 0 rgba(255, 255, 255, 0.10);
+}
+
+.glass-inset {
+  background: rgba(16, 19, 24, 0.65);
+  border: 1px solid rgba(190, 205, 225, 0.16);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.35);
+}
+
+.glass-modal {
+  background: rgba(23, 28, 36, 0.88);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(220, 230, 245, 0.22);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.glass-glow-blue {
+  box-shadow: 0 0 20px -3px rgba(75, 131, 245, 0.35);
+}
+
+/* Custom graphite scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(16, 19, 24, 0.4);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(190, 205, 225, 0.20);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(190, 205, 225, 0.35);
+}
+
+/* Hardware-accelerated transitions */
+.transition-smooth {
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Print Styles: Strict white A4 for memos and business reports */
+@media print {
+  aside,
+  header,
+  nav,
+  .no-print {
+    display: none !important;
+  }
+  body, html {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+}

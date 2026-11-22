@@ -5,9 +5,26 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import 'voice_parser.dart';
 
 class AiNluService {
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Configuration: Cloud AI (Gemini) Flag
+  // Set to false to avoid paid API calls and eliminate runtime API key dependence.
+  //
+  // HOW TO RE-ENABLE IN THE FUTURE:
+  // 1. Recommended (Production): Route NLU requests through a Supabase Edge Function
+  //    (e.g., 'ai-assistant') so the API key is kept server-side in Supabase secrets.
+  // 2. Alternative (Direct): Set isGeminiEnabled = true and configure GEMINI_API_KEY
+  //    in your backend or environment variables.
+  // ─────────────────────────────────────────────────────────────────────────────
+  static const bool isGeminiEnabled = false;
+
   GenerativeModel? _model;
 
   AiNluService() {
+    if (!isGeminiEnabled) {
+      debugPrint('[AiNluService] Cloud AI is on hold. Operating in deterministic local parsing mode.');
+      return;
+    }
+
     final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
     if (apiKey.isNotEmpty) {
       _model = GenerativeModel(
@@ -19,12 +36,17 @@ class AiNluService {
           maxOutputTokens: 512,
         ),
       );
+    } else {
+      debugPrint('[AiNluService] No GEMINI_API_KEY configured. Falling back to local parser.');
     }
   }
 
+  /// Indicates whether the Cloud AI model is active and ready for inference.
+  bool get isAiAvailable => isGeminiEnabled && _model != null;
+
   // ─────────────────────────────────────────────────────────────────────────
-  /// Parse speech text into a structured [VoiceAction] using Gemini AI.
-  /// Falls back to local [VoiceParser] if the API is unavailable.
+  /// Parse speech text into a structured [VoiceAction].
+  /// When [isGeminiEnabled] is false, uses the fast, deterministic [VoiceParser].
   // ─────────────────────────────────────────────────────────────────────────
   Future<VoiceAction> parseSpokenText(
     String text, {
@@ -33,8 +55,8 @@ class AiNluService {
     List<String> siteNames = const [],
     bool isTamil = false,
   }) async {
-    // Try AI first
-    if (_model != null) {
+    // 1. Try Cloud AI if enabled and initialized
+    if (isAiAvailable) {
       try {
         return await _parseWithGemini(
           text,
@@ -44,11 +66,11 @@ class AiNluService {
           isTamil: isTamil,
         );
       } catch (e) {
-        debugPrint('[AiNluService] Gemini error, falling back: $e');
+        debugPrint('[AiNluService] Gemini error, falling back to local parser: $e');
       }
     }
 
-    // Local parser fallback
+    // 2. Safe deterministic local parser (supports English, Tamil, Tanglish)
     return VoiceParser.parse(
       text,
       workerNames: workerNames,
@@ -57,6 +79,9 @@ class AiNluService {
     );
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Preserved Gemini AI Implementation (for future server/client re-enablement)
+  // ─────────────────────────────────────────────────────────────────────────
   Future<VoiceAction> _parseWithGemini(
     String text, {
     required List<String> workerNames,
@@ -73,8 +98,6 @@ class AiNluService {
     final sitesCtx = siteNames.isNotEmpty
         ? 'Known sites: ${siteNames.join(', ')}'
         : 'No known sites loaded.';
-    final lang = isTamil ? 'Tamil' : 'Indian English (en-IN)';
-
     final prompt = '''
 You are an AI assistant for a construction site management app (TSR Site Manager Pro).
 The user is a construction site manager or supervisor in India.

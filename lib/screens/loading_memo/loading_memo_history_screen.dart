@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -12,15 +13,16 @@ import '../../core/widgets/shimmer_loader.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 // Loading Memo History Screen
 // ─────────────────────────────────────────────────────────────────────────────
-class LoadingMemoHistoryScreen extends StatefulWidget {
+class LoadingMemoHistoryScreen extends ConsumerStatefulWidget {
   const LoadingMemoHistoryScreen({super.key});
 
   @override
-  State<LoadingMemoHistoryScreen> createState() =>
+  ConsumerState<LoadingMemoHistoryScreen> createState() =>
       _LoadingMemoHistoryScreenState();
 }
 
-class _LoadingMemoHistoryScreenState extends State<LoadingMemoHistoryScreen>
+class _LoadingMemoHistoryScreenState
+    extends ConsumerState<LoadingMemoHistoryScreen>
     with SingleTickerProviderStateMixin {
   List<Map<String, dynamic>> _memos = [];
   List<Map<String, dynamic>> _filtered = [];
@@ -34,9 +36,6 @@ class _LoadingMemoHistoryScreenState extends State<LoadingMemoHistoryScreen>
   final _searchController = TextEditingController();
   late AnimationController _listCtrl;
 
-  // Role check for delete
-  bool _isAdmin = false;
-
   @override
   void initState() {
     super.initState();
@@ -45,7 +44,6 @@ class _LoadingMemoHistoryScreenState extends State<LoadingMemoHistoryScreen>
       duration: const Duration(milliseconds: 600),
     );
     _loadData();
-    _checkRole();
   }
 
   @override
@@ -56,27 +54,6 @@ class _LoadingMemoHistoryScreenState extends State<LoadingMemoHistoryScreen>
   }
 
   // ── Data ────────────────────────────────────────────────────────────────────
-
-  Future<void> _checkRole() async {
-    try {
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user == null) return;
-      if (user.email == 'admin@tsrbuilders.com' ||
-          user.email == 'admin@tsrnuilders.com') {
-        setState(() => _isAdmin = true);
-        return;
-      }
-      final profile = await Supabase.instance.client
-          .from('user_profiles')
-          .select('role')
-          .eq('id', user.id)
-          .maybeSingle();
-      if (mounted) {
-        setState(() =>
-            _isAdmin = (profile?['role'] as String?) == AppRole.admin);
-      }
-    } catch (_) {}
-  }
 
   Future<void> _loadData() async {
     setState(() => _loading = true);
@@ -180,6 +157,17 @@ class _LoadingMemoHistoryScreenState extends State<LoadingMemoHistoryScreen>
   }
 
   Future<void> _deleteMemo(Map<String, dynamic> memo) async {
+    final isAdmin = ref.read(currentUserRoleProvider).isAdmin;
+    if (!isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unauthorized: Administrator privileges required to delete memos.'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -268,6 +256,7 @@ class _LoadingMemoHistoryScreenState extends State<LoadingMemoHistoryScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isAdmin = ref.watch(currentUserRoleProvider).isAdmin;
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -397,7 +386,7 @@ class _LoadingMemoHistoryScreenState extends State<LoadingMemoHistoryScreen>
                                 memo: _filtered[index],
                                 index: index,
                                 listCtrl: _listCtrl,
-                                isAdmin: _isAdmin,
+                                isAdmin: isAdmin,
                                 onPreview: () =>
                                     _regenerateAndShow(_filtered[index]),
                                 onDelete: () => _deleteMemo(_filtered[index]),

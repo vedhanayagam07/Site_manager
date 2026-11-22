@@ -109,6 +109,9 @@ class _VoiceAssistantSheetState extends State<VoiceAssistantSheet>
   bool get _isTamil => _currentLocale == 'ta-IN';
   bool get _isIndianEnglish => _currentLocale == 'en-IN';
   bool get _isListening => _sheetState == _SheetState.listening;
+  String get _parsingStatusText => _isTamil
+      ? 'கட்டளை செயலாக்கப்படுகிறது…'
+      : (_aiNluService.isAiAvailable ? 'Analyzing command…' : 'Processing command…');
 
   // ────────────────────────────────────────────────────────────────────────────
   // Voice
@@ -117,7 +120,7 @@ class _VoiceAssistantSheetState extends State<VoiceAssistantSheet>
     if (_isListening) {
       await _voiceService.stopListening();
       _pulseController.stop();
-      _setState(_SheetState.parsing, _isTamil ? 'கட்டளை பகுப்பாய்வு செய்யப்படுகிறது…' : 'Analyzing command…');
+      _setState(_SheetState.parsing, _parsingStatusText);
       await _parseText(_transcribedText);
     } else {
       setState(() {
@@ -139,7 +142,7 @@ class _VoiceAssistantSheetState extends State<VoiceAssistantSheet>
           if (isFinal) {
             _voiceService.stopListening();
             _pulseController.stop();
-            _setState(_SheetState.parsing, _isTamil ? 'கட்டளை பகுப்பாய்வு…' : 'Analyzing…');
+            _setState(_SheetState.parsing, _parsingStatusText);
             _parseText(text);
           }
         },
@@ -147,7 +150,7 @@ class _VoiceAssistantSheetState extends State<VoiceAssistantSheet>
           if (!mounted) return;
           _pulseController.stop();
           if (_sheetState == _SheetState.listening) {
-            _setState(_SheetState.parsing, _isTamil ? 'கட்டளை பகுப்பாய்வு…' : 'Analyzing…');
+            _setState(_SheetState.parsing, _parsingStatusText);
             await _parseText(_transcribedText);
           }
         },
@@ -195,8 +198,12 @@ class _VoiceAssistantSheetState extends State<VoiceAssistantSheet>
       }
 
       if (action.type == VoiceActionType.unknown) {
-        _setState(_SheetState.idle,
-            _isTamil ? 'கட்டளை புரியவில்லை. மீண்டும் முயற்சிக்கவும்.' : 'Command not understood. Please try again.');
+        _setState(
+          _SheetState.idle,
+          _isTamil
+              ? 'கட்டளை புரியவில்லை. எ.கா: "ரமேஷ் present" அல்லது "சிமெண்ட் in 50" என பேசவும், அல்லது படிவத்தைப் பயன்படுத்தவும்.'
+              : 'Command not recognized. Try "Mark Ramesh present" or "Add 50 cement", or use manual entry.',
+        );
         return;
       }
 
@@ -226,7 +233,7 @@ class _VoiceAssistantSheetState extends State<VoiceAssistantSheet>
     // Combine original text + answer and re-parse
     final combined = '$_transcribedText $answer';
     setState(() => _transcribedText = combined);
-    _setState(_SheetState.parsing, _isTamil ? 'கட்டளை பகுப்பாய்வு…' : 'Analyzing…');
+    _setState(_SheetState.parsing, _parsingStatusText);
     await _parseText(combined);
   }
 
@@ -533,7 +540,7 @@ class _VoiceAssistantSheetState extends State<VoiceAssistantSheet>
       _textInputController.clear();
       _showTextInput = false;
     });
-    _setState(_SheetState.parsing, _isTamil ? 'கட்டளை பகுப்பாய்வு…' : 'Analyzing…');
+    _setState(_SheetState.parsing, _parsingStatusText);
     await _parseText(text);
   }
 
@@ -576,13 +583,46 @@ class _VoiceAssistantSheetState extends State<VoiceAssistantSheet>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'Voice Assistant',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
+                        Row(
+                          children: [
+                            const Text(
+                              'Voice Assistant',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _aiNluService.isAiAvailable
+                                    ? AppColors.roseGold.withValues(alpha: 0.2)
+                                    : Colors.white.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: _aiNluService.isAiAvailable
+                                      ? AppColors.roseGold
+                                      : Colors.white24,
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: Text(
+                                _aiNluService.isAiAvailable ? 'Cloud AI' : 'Local Mode',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: _aiNluService.isAiAvailable
+                                      ? AppColors.roseGold
+                                      : AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         IconButton(
                           icon: const Icon(Icons.close, color: Colors.white60),

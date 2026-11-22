@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/services/activity_log_service.dart';
 import '../../core/theme/app_colors.dart';
@@ -16,17 +15,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   List<Map<String, dynamic>> _users = [];
   bool _loading = true;
 
-  // Use service role key to bypass RLS for all admin user operations
-  SupabaseClient? _adminClient;
-
-  SupabaseClient _getAdminClient() {
-    if (_adminClient != null) return _adminClient!;
-    final serviceKey = dotenv.env['SUPABASE_SERVICE_ROLE_KEY'] ?? '';
-    final url = dotenv.env['SUPABASE_URL'] ?? '';
-    _adminClient = SupabaseClient(url, serviceKey);
-    return _adminClient!;
-  }
-
   @override
   void initState() {
     super.initState();
@@ -36,12 +24,37 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final data = await _getAdminClient()
-          .from('user_profiles')
-          .select();
+      List<Map<String, dynamic>> loadedUsers = [];
+
+      // 1. Primary path: query via standard authenticated client (enforced by RLS)
+      try {
+        final data = await Supabase.instance.client
+            .from('user_profiles')
+            .select()
+            .order('name');
+        loadedUsers = List<Map<String, dynamic>>.from(data);
+      } catch (rlsError) {
+        debugPrint('[UserManagement] Direct select failed ($rlsError), falling back to Edge Function.');
+      }
+
+      // 2. Fallback path: invoke the authorized Edge Function if RLS returned empty or threw
+      if (loadedUsers.isEmpty) {
+        try {
+          final res = await Supabase.instance.client.functions.invoke(
+            'admin-manage-user',
+            body: {'action': 'list_users'},
+          );
+          if (res.status == 200 && res.data is Map && res.data['users'] is List) {
+            loadedUsers = List<Map<String, dynamic>>.from(res.data['users']);
+          }
+        } catch (edgeError) {
+          debugPrint('[UserManagement] Edge function list fallback failed: $edgeError');
+        }
+      }
+
       if (!mounted) return;
       setState(() {
-        _users = List<Map<String, dynamic>>.from(data);
+        _users = loadedUsers;
         _loading = false;
       });
     } catch (e) {
@@ -63,10 +76,21 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     final newStatus = current == 'active' ? 'disabled' : 'active';
 
     try {
-      await _getAdminClient()
-          .from('user_profiles')
-          .update({'status': newStatus})
-          .eq('id', user['id'] as String);
+      final res = await Supabase.instance.client.functions.invoke(
+        'admin-manage-user',
+        body: {
+          'action': 'toggle_status',
+          'userId': user['id'] as String,
+          'newStatus': newStatus,
+        },
+      );
+
+      if (res.status != 200) {
+        final errorMsg = (res.data is Map && res.data['error'] != null)
+            ? res.data['error'].toString()
+            : 'Failed to update user status';
+        throw Exception(errorMsg);
+      }
 
       await activityLog.log(
         action: newStatus == 'active' ? 'User Enabled' : 'User Disabled',
@@ -106,17 +130,19 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         title: const Text('Delete User',
             style: TextStyle(fontWeight: FontWeight.bold)),
         content: Text(
-            'Are you sure you want to delete ${user['name'] ?? 'this user'}? This cannot be undone.'),
+            'Are you sure you want to delete ${user['name'] ?? 'this user'}? This will permanently remove both their profile and login account.'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel',
-                  style: TextStyle(color: AppColors.textSecondary))),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel',
+                style: TextStyle(color: AppColors.textSecondary)),
+          ),
           TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Delete',
-                  style: TextStyle(
-                      color: AppColors.danger, fontWeight: FontWeight.bold))),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete',
+                style: TextStyle(
+                    color: AppColors.danger, fontWeight: FontWeight.bold)),
+          ),
         ],
       ),
     );
@@ -124,10 +150,20 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     if (confirm != true) return;
 
     try {
-      await _getAdminClient()
-          .from('user_profiles')
-          .delete()
-          .eq('id', user['id'] as String);
+      final res = await Supabase.instance.client.functions.invoke(
+        'admin-manage-user',
+        body: {
+          'action': 'delete_user',
+          'userId': user['id'] as String,
+        },
+      );
+
+      if (res.status != 200) {
+        final errorMsg = (res.data is Map && res.data['error'] != null)
+            ? res.data['error'].toString()
+            : 'Failed to delete user';
+        throw Exception(errorMsg);
+      }
 
       await activityLog.log(
         action: 'User Deleted',
@@ -220,7 +256,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                           style: TextStyle(fontSize: 20)),
                       const SizedBox(height: 8),
                       const Text(
-                        'Tap + Add User to create the first user.\nMake sure user_profiles table exists.',
+                        'Tap + Add User to create the first user.\nMake sure user_profiles table exists in Supabase.',
                         style: TextStyle(color: AppColors.textSecondary),
                         textAlign: TextAlign.center,
                       ),
@@ -239,156 +275,169 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                       final role = user['role'] as String? ?? 'supervisor';
                       final status =
                           user['status'] as String? ?? 'active';
+                      final email = user['email'] as String? ?? '';
                       final isActive = status == 'active';
 
-                      return Card(
+                      return Container(
                         margin: const EdgeInsets.only(bottom: 12),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Row(
+                        decoration: BoxDecoration(
+                          color: AppColors.card,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: isActive
+                                ? AppColors.border
+                                : Colors.white10,
+                          ),
+                        ),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          leading: CircleAvatar(
+                            radius: 22,
+                            backgroundColor:
+                                _roleColor(role).withValues(alpha: 0.15),
+                            child: Text(
+                              name.isNotEmpty
+                                  ? name[0].toUpperCase()
+                                  : 'U',
+                              style: TextStyle(
+                                color: _roleColor(role),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
+                            ),
+                          ),
+                          title: Row(
                             children: [
-                              CircleAvatar(
-                                radius: 24,
-                                backgroundColor:
-                                    _roleColor(role).withValues(alpha: 0.15),
+                              Expanded(
                                 child: Text(
-                                  name.isNotEmpty
-                                      ? name[0].toUpperCase()
-                                      : 'U',
+                                  name,
                                   style: TextStyle(
-                                    color: _roleColor(role),
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    color: isActive
+                                        ? Colors.white
+                                        : Colors.white38,
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: isActive
+                                      ? AppColors.success
+                                          .withValues(alpha: 0.15)
+                                      : Colors.white10,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  isActive ? 'Active' : 'Disabled',
+                                  style: TextStyle(
+                                    color: isActive
+                                        ? AppColors.success
+                                        : Colors.white38,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (email.isNotEmpty)
+                                Text(
+                                  email,
+                                  style: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 12),
+                                ),
+                              const SizedBox(height: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: _roleColor(role)
+                                      .withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  _roleLabel(role),
+                                  style: TextStyle(
+                                    color: _roleColor(role),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          trailing: PopupMenuButton<String>(
+                            icon: const Icon(Icons.more_vert,
+                                color: AppColors.textSecondary),
+                            color: AppColors.card,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14)),
+                            onSelected: (val) {
+                              if (val == 'edit') {
+                                Navigator.of(context, rootNavigator: true)
+                                    .push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        AddEditUserScreen(user: user),
+                                  ),
+                                ).then((_) => _load());
+                              } else if (val == 'toggle') {
+                                _toggleStatus(user);
+                              } else if (val == 'delete') {
+                                _deleteUser(user);
+                              }
+                            },
+                            itemBuilder: (_) => [
+                              const PopupMenuItem(
+                                value: 'edit',
+                                child: Row(
                                   children: [
-                                    Text(name,
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 15)),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        Container(
-                                          padding:
-                                              const EdgeInsets.symmetric(
-                                                  horizontal: 8,
-                                                  vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: _roleColor(role)
-                                                .withValues(alpha: 0.12),
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                          ),
-                                          child: Text(
-                                            _roleLabel(role),
-                                            style: TextStyle(
-                                              color: _roleColor(role),
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Container(
-                                          padding:
-                                              const EdgeInsets.symmetric(
-                                                  horizontal: 8,
-                                                  vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: isActive
-                                                ? AppColors.success
-                                                    .withValues(alpha: 0.12)
-                                                : AppColors.danger
-                                                    .withValues(alpha: 0.12),
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                          ),
-                                          child: Text(
-                                            isActive ? 'Active' : 'Disabled',
-                                            style: TextStyle(
-                                              color: isActive
-                                                  ? AppColors.success
-                                                  : AppColors.danger,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                    Icon(Icons.edit_outlined,
+                                        size: 18, color: AppColors.roseGold),
+                                    SizedBox(width: 8),
+                                    Text('Edit User'),
                                   ],
                                 ),
                               ),
-                              PopupMenuButton<String>(
-                                color: AppColors.card,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16)),
-                                onSelected: (value) {
-                                  if (value == 'edit') {
-                                    Navigator.of(context, rootNavigator: true).push(
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            AddEditUserScreen(user: user),
-                                      ),
-                                    ).then((_) => _load());
-                                  } else if (value == 'toggle') {
-                                    _toggleStatus(user);
-                                  } else if (value == 'delete') {
-                                    _deleteUser(user);
-                                  }
-                                },
-                                itemBuilder: (_) => [
-                                  const PopupMenuItem(
-                                    value: 'edit',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.edit_outlined,
-                                            size: 18),
-                                        SizedBox(width: 10),
-                                        Text('Edit'),
-                                      ],
+                              PopupMenuItem(
+                                value: 'toggle',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      isActive
+                                          ? Icons.block_outlined
+                                          : Icons.check_circle_outline,
+                                      size: 18,
+                                      color: isActive
+                                          ? AppColors.warning
+                                          : AppColors.success,
                                     ),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'toggle',
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          isActive
-                                              ? Icons.block
-                                              : Icons.check_circle_outline,
-                                          size: 18,
-                                          color: isActive
-                                              ? AppColors.warning
-                                              : AppColors.success,
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Text(isActive ? 'Disable' : 'Enable'),
-                                      ],
-                                    ),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'delete',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.delete_outline,
-                                            size: 18,
-                                            color: AppColors.danger),
-                                        SizedBox(width: 10),
-                                        Text('Delete',
-                                            style: TextStyle(
-                                                color: AppColors.danger)),
-                                      ],
-                                    ),
-                                  ),
-                                ],
+                                    SizedBox(width: 8),
+                                    Text(isActive
+                                        ? 'Disable User'
+                                        : 'Enable User'),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem(
+                                value: 'delete',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.delete_outline,
+                                        size: 18, color: AppColors.danger),
+                                    SizedBox(width: 8),
+                                    Text('Delete User',
+                                        style:
+                                            TextStyle(color: AppColors.danger)),
+                                  ],
+                                ),
                               ),
                             ],
                           ),

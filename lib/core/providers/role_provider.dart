@@ -9,6 +9,7 @@ class AppRole {
   static const String admin = 'admin';
   static const String projectManager = 'projectManager';
   static const String supervisor = 'supervisor';
+  static const String unknown = 'unknown';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -24,26 +25,36 @@ final authStateProvider = StreamProvider<User?>((ref) {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Provider — resolves the current user's role, watching the authStateProvider
+// Provider — resolves the current user's role from public.user_profiles
 // ─────────────────────────────────────────────────────────────────────────────
 final currentUserRoleProvider = FutureProvider<String>((ref) async {
   final userAsync = ref.watch(authStateProvider);
   final user = userAsync.value ?? Supabase.instance.client.auth.currentUser;
-  if (user == null) return AppRole.supervisor;
-
-  // Foolproof fallback: Always grant admin role to the primary admin email
-  if (user.email == 'admin@tsrbuilders.com' || user.email == 'admin@tsrnuilders.com') {
-    return AppRole.admin;
-  }
+  
+  // Unauthenticated visitors have no role
+  if (user == null) return AppRole.unknown;
 
   try {
     final profile = await Supabase.instance.client
         .from('user_profiles')
-        .select('role')
+        .select('role, status')
         .eq('id', user.id)
         .maybeSingle();
 
-    return (profile?['role'] as String?) ?? AppRole.supervisor;
+    if (profile == null) return AppRole.supervisor;
+
+    // Disabled accounts should not have active privileges
+    final status = profile['status'] as String? ?? 'active';
+    if (status == 'disabled') return AppRole.unknown;
+
+    final role = profile['role'] as String?;
+    if (role == AppRole.admin ||
+        role == AppRole.projectManager ||
+        role == AppRole.supervisor) {
+      return role!;
+    }
+
+    return AppRole.supervisor;
   } catch (e, st) {
     debugPrint('[currentUserRoleProvider] Error fetching role: $e\n$st');
     return AppRole.supervisor;
